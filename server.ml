@@ -1,7 +1,6 @@
-#load "unix.cma";;
 
 let establish_server server_fun sockaddr =
-   let domain = domain_of sockaddr in
+   let domain = Unix.PF_INET in
    let sock = Unix.socket domain Unix.SOCK_STREAM 0 
    in Unix.bind sock sockaddr ;
       Unix.listen sock 3;
@@ -23,10 +22,13 @@ let get_my_addr () =
 
 let main_server  serv_fun =
    if Array.length Sys.argv < 2 then Printf.eprintf "usage : serv_up port\n"
-   else try
+   else 
+        Printf.printf "server started \n";
+        try
           let port =  int_of_string Sys.argv.(1) in 
           let my_address = get_my_addr() 
-          in establish_server serv_fun  (Unix.ADDR_INET(my_address, port))
+          in
+              establish_server serv_fun  (Unix.ADDR_INET(my_address, port));
         with
           Failure("int_of_string") -> 
             Printf.eprintf "serv_up : bad port number\n" ;;
@@ -39,5 +41,9 @@ let uppercase_service ic oc =
        done
    with _ -> Printf.printf "End of text\n" ; flush stdout ; exit 0 ;;
 
-let go_uppercase_service () = 
-   Unix.handle_unix_error main_server uppercase_service ;;
+let go_uppercase_service () =
+   Printf.printf "Server started\n";
+   flush stdout;
+   Unix.handle_unix_error main_server uppercase_service ;; 
+
+go_uppercase_service () ;;
