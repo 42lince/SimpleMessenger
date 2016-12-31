@@ -23,7 +23,6 @@ let get_my_addr () =
 let main_server  serv_fun =
    if Array.length Sys.argv < 2 then Printf.eprintf "usage : serv_up port\n"
    else 
-        Printf.printf "server started \n";
         try
           let port =  int_of_string Sys.argv.(1) in 
           let my_address = get_my_addr() 
