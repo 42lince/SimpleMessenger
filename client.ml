@@ -21,13 +21,13 @@ let main_client client_fun =
 let client_fun ic oc =
     try 
         while true do
-            print_string "Request : ";
+            print_string "Client : ";
             flush stdout;
-            output_string oc ((input_line stdin)^"\n");
+            let send_msg = input_line stdin in
+            output_string oc (send_msg ^ "\n");
             flush oc;
             let r = input_line ic in
-                Printf.printf "Response: %s\n\n" r ;
-                if r = "END" then ( Unix.shutdown_connection ic ; raise Exit) ;
+                Printf.printf "Server : %s\n\n" r ; flush stdout;
         done
     with
         Exit -> exit 0

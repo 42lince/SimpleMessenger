@@ -32,17 +32,21 @@ let main_server  serv_fun =
           Failure("int_of_string") -> 
             Printf.eprintf "serv_up : bad port number\n" ;;
 
-let uppercase_service ic oc =
+let receive_service ic oc =
    try while true do    
-         let s = input_line ic in 
-         let r = String.uppercase s 
-         in output_string oc (r^"\n") ; flush oc
+         let receive_msg = input_line ic in
+            Printf.printf "Client : %s \n" receive_msg;
+            flush stdout; 
+            output_string oc ("message received \n") ;
+            flush oc;
+            print_string "Server :";
+            flush stdout;
        done
    with _ -> Printf.printf "End of text\n" ; flush stdout ; exit 0 ;;
 
-let go_uppercase_service () =
+let go_server_service () =
    Printf.printf "Server started\n";
    flush stdout;
-   Unix.handle_unix_error main_server uppercase_service ;; 
+   Unix.handle_unix_error main_server receive_service ;; 
 
-go_uppercase_service () ;;
+go_server_service () ;;
