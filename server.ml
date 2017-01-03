@@ -1,6 +1,10 @@
 open Lwt;;
 
 
+
+let write_to_ui str = Lwt_io.write_line Lwt_io.stdout str >>= (fun () -> Lwt_io.flush Lwt_io.stdout);;
+
+
 let rec serv_service ic oc () =
     try
         let t = Lwt_io.read_line Lwt_io.stdin in
@@ -15,16 +19,14 @@ let rec serv_service ic oc () =
             | _  -> match msg with
                 | Some "message received by client" ->
                     let time_elapsed = string_of_float (Unix.gettimeofday() -. start) in
-                    Lwt_io.write_line Lwt_io.stdout ("message received by client. time elapsed (s) : "^time_elapsed) >>=
-                    (fun () -> Lwt_io.flush Lwt_io.stdout >>= serv_service ic oc)
+                    write_to_ui ("message received by client. time elapsed (s) : "^time_elapsed) >>= serv_service ic oc
                 | Some msg ->
                     let reply = "message received by server" in
                     Lwt_io.write_line oc reply >>=
-                    (fun () -> Lwt_io.write_line Lwt_io.stdout msg >>=
-                        (fun () -> Lwt_io.flush Lwt_io.stdout >>=
+                    (fun () -> Lwt_io.flush oc >>=
+                        (fun () -> write_to_ui msg >>=
                             serv_service ic oc))
-                | None -> Lwt_io.write_line Lwt_io.stdout "Connection closed" >>=
-                       (fun () -> Lwt_io.flush Lwt_io.stdout >>= return))
+                | None -> write_to_ui "Connection closed" >>= return)
     with
         Exit -> return_unit
       | exn -> Lwt_io.close ic >>= (fun () -> Lwt.fail exn) ;;
@@ -34,10 +36,12 @@ let rec serv_service ic oc () =
 let create_server sock = 
    let rec serve () =
        Lwt_unix.accept sock >>= (fun (s, caller) ->
-           let inchan = Lwt_chan.in_channel_of_descr s
-           and outchan = Lwt_chan.out_channel_of_descr s in
-           Lwt.on_failure (serv_service inchan outchan ()) (fun e -> Lwt_log.ign_error (Printexc.to_string e));
-           Lwt_log.info "New connection" >>= return;) >>= serve
+           write_to_ui "Connection established. Please enter message below" >>=
+           (fun () -> 
+               let inchan = Lwt_chan.in_channel_of_descr s
+               and outchan = Lwt_chan.out_channel_of_descr s in
+               Lwt.on_failure (serv_service inchan outchan ()) (fun e -> Lwt_log.ign_error (Printexc.to_string e));
+               Lwt_log.info "New connection" >>= return)) >>= serve
    in serve;;
 
 

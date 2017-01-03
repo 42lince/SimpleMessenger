@@ -1,13 +1,17 @@
 open Lwt;;
 
 
+let write_to_ui str = Lwt_io.write_line Lwt_io.stdout str >>= (fun () -> Lwt_io.flush Lwt_io.stdout);;
+
+
+
 let rec client_service ic oc () =
 
     try 
         let t = Lwt_io.read_line Lwt_io.stdin in
         let start = Unix.gettimeofday() in
-        let _ = Lwt.bind t 
-        (fun send_msg -> Lwt_io.write_line oc send_msg) in
+        let _ = Lwt.bind t
+        (fun send_msg -> Lwt_io.write_line oc send_msg >>= (fun () -> Lwt_io.flush oc) >>= client_service ic oc) in
  
         Lwt_io.read_line_opt ic >>=
     	(fun msg ->
@@ -16,16 +20,14 @@ let rec client_service ic oc () =
             | _  -> match msg with
                 | Some "message received by server" -> 
                     let time_elapsed = string_of_float (Unix.gettimeofday() -. start) in 
-                    Lwt_io.write_line Lwt_io.stdout ("message received by server. time elapsed (s) :"^time_elapsed) >>= 
-                    (fun () -> Lwt_io.flush Lwt_io.stdout >>= client_service ic oc)
+                    write_to_ui ("message received by server. time elapsed (s) :"^time_elapsed) >>= client_service ic oc
                 | Some msg ->
                     let reply = "message received by client" in
-                    Lwt_io.write_line oc reply >>=
-                    (fun () -> Lwt_io.write_line Lwt_io.stdout msg >>=
-                        (fun () -> Lwt_io.flush Lwt_io.stdout >>=
+                    Lwt_io.write_line oc reply >>= 
+                    (fun () -> Lwt_io.flush oc >>=
+                        (fun () -> write_to_ui msg >>= 
                             client_service ic oc))
-                | None -> Lwt_io.write_line Lwt_io.stdout "Connection closed" >>= 
-                       (fun () -> Lwt_io.flush Lwt_io.stdout >>= return))
+                | None ->  write_to_ui "Connection closed" >>= raise (Failure "server stopped"))
     with
         Exit -> return_unit
       | exn -> Lwt_io.close ic >>= (fun () -> Lwt.fail exn) ;;
@@ -34,7 +36,9 @@ let rec client_service ic oc () =
 
 let establish_client sockaddr =
     Lwt_io.open_connection sockaddr >>=
-    (fun (ic, oc) -> client_service ic oc () >>= (fun() -> Lwt_io.close ic));;
+    (fun (ic, oc) -> write_to_ui "Connection established. Please enter message below" >>= 
+        (fun () -> client_service ic oc () >>= 
+            (fun() -> Lwt_io.close ic)));;
 
 
 
