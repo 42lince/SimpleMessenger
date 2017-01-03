@@ -6,8 +6,8 @@ let rec client_service ic oc () =
     try 
         let t = Lwt_io.read_line Lwt_io.stdin in
         let start = Unix.gettimeofday() in
-        Lwt.bind t 
-        (fun send_msg -> Lwt_io.write_line oc send_msg); 
+        let _ = Lwt.bind t 
+        (fun send_msg -> Lwt_io.write_line oc send_msg) in
  
         Lwt_io.read_line_opt ic >>=
     	(fun msg ->
