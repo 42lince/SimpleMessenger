@@ -1,4 +1,42 @@
-let main_client client_fun =
+open Lwt;;
+
+
+let rec client_service ic oc () =
+
+    try 
+        let t = Lwt_io.read_line Lwt_io.stdin in
+        Lwt.bind t 
+        (fun send_msg -> Lwt_io.write_line oc send_msg); 
+ 
+        Lwt_io.read_line_opt ic >>=
+    	(fun msg ->
+            match Lwt.state t with
+            | Lwt.Fail exn -> Lwt.fail exn
+            | _  -> match msg with
+                | Some "message received by server" -> 
+                    Lwt_io.write_line Lwt_io.stdout "message received by server" >>= 
+                    (fun () -> Lwt_io.flush Lwt_io.stdout >>= client_service ic oc)
+                | Some msg ->
+                    let reply = "message received by client" in
+                    Lwt_io.write_line oc reply >>=
+                    (fun () -> Lwt_io.write_line Lwt_io.stdout msg >>=
+                        (fun () -> Lwt_io.flush Lwt_io.stdout >>=
+                            client_service ic oc))
+                | None -> Lwt_io.write_line Lwt_io.stdout "Connection closed" >>= 
+                       (fun () -> Lwt_io.flush Lwt_io.stdout >>= return))
+    with
+        Exit -> return_unit
+      | exn -> Lwt_io.close ic >>= (fun () -> Lwt.fail exn) ;;
+
+
+
+let establish_client sockaddr =
+    Lwt_io.open_connection sockaddr >>=
+    (fun (ic, oc) -> client_service ic oc () >>= (fun() -> Lwt_io.close ic));;
+
+
+
+let main_client () =
     if Array.length Sys.argv < 3 then
         Printf.printf "usage : client server port \n"
     else let server = Sys.argv.(1) in
@@ -7,32 +45,11 @@ let main_client client_fun =
             with Failure("inet_addr_of_string") ->
                 try (Unix.gethostbyname server).Unix.h_addr_list.(0)
                 with Not_found ->
-                    Printf.eprintf "%s : Unknown server\n" server;
-                    exit 2
+                    Printf.eprintf "%s : Unknown server\n" server; exit 2
         in try 
             let port = int_of_string (Sys.argv.(2)) in 
             let sockaddr = Unix.ADDR_INET(server_addr, port) in
-            let ic, oc = Unix.open_connection sockaddr
-            in client_fun ic oc ;
-                Unix.shutdown_connection ic
-           with Failure("int_of_string") -> Printf.eprintf "bad port number";
-                                            exit 2;;
+            Lwt_main.run (establish_client sockaddr);
+           with Failure("int_of_string") -> Printf.eprintf "bad port number"; exit 2;;
 
-let client_fun ic oc =
-    try 
-        while true do
-            print_string "Client : ";
-            flush stdout;
-            let send_msg = input_line stdin in
-            output_string oc (send_msg ^ "\n");
-            flush oc;
-            let r = input_line ic in
-                Printf.printf "Server : %s\n\n" r ; flush stdout;
-        done
-    with
-        Exit -> exit 0
-      | exn -> Unix.shutdown_connection ic ; raise exn ;;
-
-let run_client () = main_client client_fun;;
-
-run_client() ;; 
+main_client();;
