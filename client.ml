@@ -5,6 +5,7 @@ let rec client_service ic oc () =
 
     try 
         let t = Lwt_io.read_line Lwt_io.stdin in
+        let start = Unix.gettimeofday() in
         Lwt.bind t 
         (fun send_msg -> Lwt_io.write_line oc send_msg); 
  
@@ -14,7 +15,8 @@ let rec client_service ic oc () =
             | Lwt.Fail exn -> Lwt.fail exn
             | _  -> match msg with
                 | Some "message received by server" -> 
-                    Lwt_io.write_line Lwt_io.stdout "message received by server" >>= 
+                    let time_elapsed = string_of_float (Unix.gettimeofday() -. start) in 
+                    Lwt_io.write_line Lwt_io.stdout ("message received by server. time elapsed (s) :"^time_elapsed) >>= 
                     (fun () -> Lwt_io.flush Lwt_io.stdout >>= client_service ic oc)
                 | Some msg ->
                     let reply = "message received by client" in
